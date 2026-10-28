@@ -1,12 +1,10 @@
 package com.wposs.catalogo.controlador;
 
-import com.wposs.catalogo.modelo.Estadisticas;
-import com.wposs.catalogo.modelo.Producto;
+import com.wposs.catalogo.modelo.*;
 import com.wposs.catalogo.servicio.ProductoServicio;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
-
 import java.net.URI;
 import java.util.List;
 
@@ -14,56 +12,24 @@ import java.util.List;
 @RequestMapping("/api/productos")
 public class ProductoControlador {
     private final ProductoServicio servicio;
-
-    public ProductoControlador(ProductoServicio servicio) {
-        this.servicio = servicio;
-    }
-
+    public ProductoControlador(ProductoServicio servicio){this.servicio=servicio;}
     @GetMapping
-    public ResponseEntity<List<Producto>> listar(@RequestParam(required = false) String categoria) {
-        return ResponseEntity.ok(categoria == null
-                ? servicio.buscarTodos() : servicio.buscarPorCategoria(categoria));
-    }
+    public ResponseEntity<List<Producto>> listar(@RequestParam(required=false) String categoria){return ResponseEntity.ok(categoria==null?servicio.buscarTodos():servicio.buscarPorCategoria(categoria));}
 
-    // Debe ir antes de /{id} para evitar que "estadisticas" se trate como identificador.
+
+
     @GetMapping("/estadisticas")
-    public ResponseEntity<Estadisticas> estadisticas() {
-        return ResponseEntity.ok(servicio.estadisticas());
-    }
-
+    public ResponseEntity<Estadisticas> estadisticas(){return ResponseEntity.ok(servicio.estadisticas());}
+    @GetMapping("/sin-stock")
+    public ResponseEntity<List<Producto>> sinStock(@RequestParam(defaultValue="5") int limite){return ResponseEntity.ok(servicio.sinStock(limite));}
     @GetMapping("/{id}")
-    public ResponseEntity<Producto> buscar(@PathVariable Long id) {
-        return servicio.buscarPorId(id).map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
-    }
-
+    public ResponseEntity<Producto> buscar(@PathVariable Long id){return servicio.buscarPorId(id).map(ResponseEntity::ok).orElseGet(()->ResponseEntity.notFound().build());}
     @PostMapping
-    public ResponseEntity<Producto> crear(@RequestBody Producto producto) {
-        Producto creado = servicio.crear(producto);
-        URI ubicacion = ServletUriComponentsBuilder.fromCurrentRequest()
-                .path("/{id}").buildAndExpand(creado.id()).toUri();
-        return ResponseEntity.created(ubicacion).body(creado);
-    }
-
+    public ResponseEntity<Producto> crear(@RequestBody ProductoDatos datos){Producto p=servicio.crear(datos);URI uri=ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(p.getId()).toUri();return ResponseEntity.created(uri).body(p);}
     @PutMapping("/{id}")
-    public ResponseEntity<Producto> actualizar(@PathVariable Long id, @RequestBody Producto producto) {
-        return servicio.actualizar(id, producto).map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
-    }
-
+    public ResponseEntity<Producto> actualizar(@PathVariable Long id,@RequestBody ProductoDatos datos){return servicio.actualizar(id,datos).map(ResponseEntity::ok).orElseGet(()->ResponseEntity.notFound().build());}
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
-        return servicio.eliminar(id) ? ResponseEntity.noContent().build()
-                : ResponseEntity.notFound().build();
-    }
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Void> datosInvalidos(IllegalArgumentException excepcion) {
-        return ResponseEntity.badRequest().build();
-    }
-
-    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
-    public ResponseEntity<Void> jsonInvalido(org.springframework.http.converter.HttpMessageNotReadableException excepcion) {
-        return ResponseEntity.badRequest().build();
-    }
+    public ResponseEntity<Void> eliminar(@PathVariable Long id){return servicio.eliminar(id)?ResponseEntity.noContent().build():ResponseEntity.notFound().build();}
+    @ExceptionHandler({IllegalArgumentException.class,org.springframework.http.converter.HttpMessageNotReadableException.class})
+    public ResponseEntity<Void> invalido(Exception ex){return ResponseEntity.badRequest().build();}
 }
