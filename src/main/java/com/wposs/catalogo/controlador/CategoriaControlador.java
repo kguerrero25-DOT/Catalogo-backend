@@ -1,22 +1,48 @@
 package com.wposs.catalogo.controlador;
 
-import com.wposs.catalogo.modelo.Categoria;
+import com.wposs.catalogo.dto.CategoriaDetalle;
+import com.wposs.catalogo.dto.CategoriaNueva;
 import com.wposs.catalogo.servicio.CategoriaServicio;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @RestController
 @RequestMapping("/api/categorias")
 public class CategoriaControlador {
     private final CategoriaServicio servicio;
-    public CategoriaControlador(CategoriaServicio servicio){this.servicio=servicio;}
-    public record CategoriaDatos(String nombre) {}
-    @GetMapping public List<Categoria> listar(){return servicio.listar();}
-    @PostMapping public ResponseEntity<Categoria> crear(@RequestBody CategoriaDatos datos){Categoria c=servicio.crear(datos.nombre());URI uri=ServletUriComponentsBuilder.fromCurrentRequest().path("/{id}").buildAndExpand(c.getId()).toUri();return ResponseEntity.created(uri).body(c);}
-    @DeleteMapping("/{id}") public ResponseEntity<Void> eliminar(@PathVariable Long id){try{return servicio.eliminar(id)?ResponseEntity.noContent().build():ResponseEntity.notFound().build();}catch(DataIntegrityViolationException ex){return ResponseEntity.status(409).build();}}
-    @ExceptionHandler(IllegalArgumentException.class) public ResponseEntity<Void> invalido(){return ResponseEntity.badRequest().build();}
+
+    public CategoriaControlador(CategoriaServicio servicio) {
+        this.servicio = servicio;
+    }
+
+    @GetMapping
+    public ResponseEntity<List<CategoriaDetalle>> listar() {
+        return ResponseEntity.ok(servicio.listarDetalles());
+    }
+
+    @PostMapping
+    public ResponseEntity<CategoriaDetalle> crear(@Valid @RequestBody CategoriaNueva datos) {
+        CategoriaDetalle categoria = servicio.crear(datos);
+        URI uri = ServletUriComponentsBuilder.fromCurrentRequest()
+                .path("/{id}")
+                .buildAndExpand(categoria.id())
+                .toUri();
+        return ResponseEntity.created(uri).body(categoria);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> eliminar(@PathVariable Long id) {
+        servicio.eliminarRequerido(id);
+        return ResponseEntity.noContent().build();
+    }
 }

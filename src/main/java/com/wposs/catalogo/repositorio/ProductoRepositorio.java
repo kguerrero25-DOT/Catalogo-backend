@@ -11,6 +11,7 @@ public interface ProductoRepositorio extends JpaRepository<Producto,Long> {
     List<Producto> findByCategoria_NombreIgnoreCase(String nombre);
     List<Producto> findByPrecioBetween(BigDecimal min, BigDecimal max);
     Optional<Producto> findByTituloIgnoreCase(String titulo);
+    boolean existsByCategoria_Id(Long categoriaId);
     @EntityGraph(attributePaths = {"categoria"})
     List<Producto> findByExistenciasLessThan(Integer limite);
     @EntityGraph(attributePaths = {"categoria"})

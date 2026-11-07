@@ -24,7 +24,7 @@ La contraseña se configura con `DB_PASSWORD` (valor local por defecto: `catalog
 - POST `/api/categorias` → 201 + Location
 - DELETE `/api/categorias/{id}` → 204, 404 o 409
 
-Ejemplo JSON producto: `{"titulo":"Nuevo","precio":1999.99,"categoria_id":1,"existencias":3}`. También acepta `"categoria":"libros"` para mantener compatibilidad con Backend 01.
+Ejemplo JSON producto: `{"titulo":"Nuevo","precio":1999.99,"categoriaId":1,"existencias":3}`.
 
 ## N+1
 
@@ -142,3 +142,22 @@ Hibernate actualizó el precio de un producto sin utilizar el método save(), me
 Se ejecutaron siete pruebas automatizadas correctamente, sin fallos ni errores.
 
 ![Pruebas exitosas](evidencias/pruebas-exitosas.jpeg)
+
+## Backend 03: DTOs, validaciones y manejo de errores
+
+### Demostración del rollback transaccional
+
+Se ejecutaron dos métodos `@Transactional` sobre el mismo producto de prueba, cuyo precio inicial era `10.00`:
+
+- Al cambiarlo a `20.00` y lanzar una excepción checked, la transacción confirmó el cambio. Una lectura posterior encontró el precio `20.00`.
+- Al intentar cambiarlo a `30.00` y lanzar una `RuntimeException`, la transacción revirtió el cambio. Una lectura posterior mantuvo el precio `20.00`.
+
+La demostración está automatizada en `TransaccionesDemostracionTest`; el producto de prueba se elimina al terminar.
+
+### Demostración de aislamiento de la entidad
+
+Temporalmente se agregó `costoProveedor` a `Producto` y un endpoint de prueba que devolvía la entidad con el valor `123.45`. La respuesta de ese endpoint incluyó `"costoProveedor":123.45`. En la respuesta de `GET /api/productos/1`, que devuelve `ProductoDetalle`, el campo no apareció. Después de verificar ambos resultados se retiraron el campo y el endpoint temporal; ningún controlador de la aplicación expone la entidad JPA.
+
+### Pruebas de API del Backend 03
+
+Las pruebas MockMvc verifican: precio negativo y campo `campos.precio`; título en blanco y `campos.titulo`; título de 200 caracteres; categoría inexistente con 400; título duplicado con 409; producto inexistente con 404, mensaje y ruta; JSON malformado con 400; y detalle de producto sin `categoriaId` ni relaciones anidadas. También se conservan las pruebas existentes de listado, creación con `Location`, eliminación, estadísticas y filtro por categoría.
