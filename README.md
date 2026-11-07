@@ -1,4 +1,4 @@
-# Taller Backend 02 — Persistencia con JPA y Hibernate
+# # Catálogo Backend — Talleres Backend 02 y 03
 
 Spring Boot 3.5.7, Java 21, PostgreSQL y H2 para pruebas. Continúa Backend 01.
 
