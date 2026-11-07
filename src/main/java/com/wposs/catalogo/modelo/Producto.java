@@ -1,6 +1,4 @@
 package com.wposs.catalogo.modelo;
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
@@ -16,7 +14,6 @@ public class Producto {
     private BigDecimal precio;
     @ManyToOne(fetch=FetchType.LAZY,optional=false)
     @JoinColumn(name="categoria_id",nullable=false)
-    @JsonIgnore
     private Categoria categoria;
     @Column(nullable=false)
     private Integer existencias;
