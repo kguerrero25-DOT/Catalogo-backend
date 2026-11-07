@@ -20,7 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 @ActiveProfiles("test")
 @SpringBootTest
 @Import(TransaccionesDemostracionTest.Configuracion.class)
-class TransaccionesDemostracionTest {
+class TransaccionesDemostracionTest extends BasePruebasIntegracion {
     @Autowired
     private ProductoRepositorio productos;
 

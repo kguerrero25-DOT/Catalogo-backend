@@ -8,6 +8,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.security.test.context.support.WithMockUser;
 
 import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -16,7 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 @SpringBootTest
 @AutoConfigureMockMvc
-class ProductoControladorTest {
+class ProductoControladorTest extends BasePruebasIntegracion {
     @Autowired
     private MockMvc mvc;
 
@@ -36,6 +37,7 @@ class ProductoControladorTest {
     }
 
     @Test
+    @WithMockUser(roles = "EDITOR")
     void crearValidoDevuelve201YLocation() throws Exception {
         mvc.perform(post("/api/productos")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -49,6 +51,7 @@ class ProductoControladorTest {
     }
 
     @Test
+    @WithMockUser(roles = "EDITOR")
     void crearPrecioNegativoDevuelve400ConErrorDelCampo() throws Exception {
         mvc.perform(post("/api/productos")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -60,6 +63,7 @@ class ProductoControladorTest {
     }
 
     @Test
+    @WithMockUser(roles = "EDITOR")
     void tituloEnBlancoDevuelve400ConErrorDelCampo() throws Exception {
         mvc.perform(post("/api/productos")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -71,6 +75,7 @@ class ProductoControladorTest {
     }
 
     @Test
+    @WithMockUser(roles = "EDITOR")
     void tituloDeDoscientosCaracteresDevuelve400() throws Exception {
         String titulo = "x".repeat(200);
         mvc.perform(post("/api/productos")
@@ -83,6 +88,7 @@ class ProductoControladorTest {
     }
 
     @Test
+    @WithMockUser(roles = "EDITOR")
     void categoriaInexistenteDevuelve400() throws Exception {
         mvc.perform(post("/api/productos")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -95,6 +101,7 @@ class ProductoControladorTest {
     }
 
     @Test
+    @WithMockUser(roles = "EDITOR")
     void tituloDuplicadoDevuelve409() throws Exception {
         String json = """
                 {"titulo":"Producto duplicado de prueba","precio":10.00,"categoriaId":1,"existencias":1}
@@ -108,6 +115,7 @@ class ProductoControladorTest {
     }
 
     @Test
+    @WithMockUser(roles = "EDITOR")
     void jsonMalformadoDevuelve400ConErrorEstructurado() throws Exception {
         mvc.perform(post("/api/productos")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -133,6 +141,7 @@ class ProductoControladorTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void eliminarDosVecesDevuelve204Y404() throws Exception {
         String json = """
                 {"titulo":"Temporal","precio":1500,"categoriaId":1,"existencias":1}
