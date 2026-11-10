@@ -6,7 +6,7 @@ COPY src ./src
 RUN mvn -B -DskipTests package
 
 FROM eclipse-temurin:21.0.13_9-jdk-alpine-3.21 AS runtime
-RUN jlink --add-modules java.base,java.compiler,java.desktop,java.instrument,java.net.http,java.prefs,java.rmi,java.scripting,java.security.jgss,java.sql.rowset,jdk.jfr,jdk.management,jdk.unsupported \
+RUN jlink --add-modules java.base,java.compiler,java.desktop,java.instrument,java.net.http,java.prefs,java.rmi,java.scripting,java.security.jgss,java.sql.rowset,jdk.crypto.ec,jdk.jfr,jdk.management,jdk.unsupported \
     --strip-debug --no-man-pages --no-header-files --compress=2 \
     --output /opt/java-runtime
 
