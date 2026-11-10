@@ -1,4 +1,142 @@
-# Catálogo Backend — Talleres Backend 01, 02, 03 y 04
+# Catálogo Backend — Talleres Backend 01–05
+
+## Backend 05 — Documentación, perfiles y despliegue
+
+### Descripción y tecnologías
+
+API REST de productos, categorías y usuarios, desarrollada con Java 21 y Spring Boot 3.5.7. Usa Spring Web, Spring Security, JWT (JJWT), BCrypt, Spring Data JPA, PostgreSQL, Flyway, Springdoc OpenAPI, Actuator y pruebas con H2. Se conservan las operaciones de catálogo, validaciones, transacciones, errores JSON y autorización por roles de los talleres anteriores.
+
+### Perfiles y base de datos
+
+`application.properties` aplica `ddl-auto=validate`, Flyway y el puerto `${PORT:8080}`. El perfil predeterminado es `dev`. `application-dev.properties` apunta por defecto a PostgreSQL local en `localhost:5433/catalogo`, muestra SQL y permite Swagger. `application-test.properties` utiliza H2 en memoria, las migraciones reales y datos de prueba; Swagger está desactivado. `application-prod.properties` requiere explícitamente las variables de base de datos y CORS; desactiva Swagger y el SQL detallado. Las contraseñas y el secreto JWT no tienen valores predeterminados.
+
+Flyway aplica, en orden, `V1__esquema_inicial.sql` (categorías y productos), `V2__usuarios_y_roles.sql` y `V3__datos_semilla.sql` (categorías iniciales). El esquema coincide con las entidades actuales; Hibernate valida el esquema, pero no lo crea ni lo actualiza. Los veinte productos de ejemplo se cargan únicamente mediante el `CommandLineRunner` activo en `dev`; las pruebas los preparan desde `src/test/resources/data.sql`.
+
+La conexión de desarrollo mantiene el puerto host `5433`, compatible con la configuración local anterior. Compose publica PostgreSQL en ese mismo puerto para herramientas locales, mientras que la API dentro de Compose se conecta a `postgres:5432` por la red interna. Compose usa un volumen nuevo llamado `catalogo_deploy_pgdata`; no borra ni reutiliza automáticamente el volumen antiguo. Una base existente que no tenga historial Flyway requiere una estrategia de respaldo y adopción/migración revisada antes de apuntarla a la aplicación; no se ejecuta `create` sobre ella.
+
+### Variables de entorno
+
+`JWT_SECRETO` debe contener como mínimo 32 bytes; `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` y `CORS_ORIGENES` son obligatorias en producción. `PORT` lo proporciona la plataforma o usa 8080 localmente. `.env.ejemplo` contiene valores ficticios para Compose; cópialo a `.env`, reemplaza todos los marcadores y no versionees `.env`.
+
+Para iniciar la API localmente desde PowerShell, configura las variables en la sesión sin escribir secretos en el repositorio ni imprimirlos:
+
+```powershell
+$env:SPRING_PROFILES_ACTIVE = "dev"
+$env:DB_URL = "jdbc:postgresql://localhost:5433/catalogo"
+$env:DB_USERNAME = "catalogo"
+$credencialDb = Get-Credential -UserName catalogo -Message "Credencial local de PostgreSQL"
+$env:DB_PASSWORD = $credencialDb.GetNetworkCredential().Password
+$bytes = New-Object byte[] 32
+$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+$rng.GetBytes($bytes)
+$rng.Dispose()
+$env:JWT_SECRETO = [Convert]::ToBase64String($bytes)
+$env:CORS_ORIGENES = "http://localhost:4200"
+Remove-Variable bytes, rng, credencialDb
+.\mvnw.cmd spring-boot:run
+```
+
+Las variables establecidas en PowerShell aplican solo a esa sesión. Para probar con PostgreSQL local, confirma que la base está disponible en `localhost:5433`; no reutilices una base de datos con datos sin respaldar y preparar antes su historial Flyway.
+
+### Swagger / OpenAPI
+
+La especificación OpenAPI documenta título, versión, descripción y autenticación mediante token firmado. Controladores y operaciones documentan respuestas, y DTOs de entrada incluyen descripciones y ejemplos ficticios, sin alterar sus anotaciones de validación.
+
+Swagger UI: `http://localhost:8080/swagger-ui/index.html`
+
+OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+
+Ambas rutas son públicas solo en `dev`; en `prod` Swagger UI y `/v3/api-docs` están deshabilitados y sus rutas no se autorizan como públicas.
+
+### Endpoints, respuestas y roles
+
+| Método | Ruta | Respuestas principales | Acceso |
+| --- | --- | --- | --- |
+| `POST` | `/api/auth/registro` | 201, 400, 409 | Público; asigna `USER` |
+| `POST` | `/api/auth/login` | 200, 400, 401 | Público |
+| `GET` | `/api/auth/yo` | 200, 401 | JWT válido |
+| `GET` | `/api/productos` | 200 | Público; admite `?categoria=` |
+| `GET` | `/api/productos/{id}` | 200, 404 | Público |
+| `GET` | `/api/productos/estadisticas` | 200 | Público |
+| `GET` | `/api/productos/sin-stock?limite=5` | 200, 400 | Público |
+| `POST` | `/api/productos` | 201, 400, 401, 403, 409 | `ADMIN`, `EDITOR` |
+| `PUT` | `/api/productos/{id}` | 200, 400, 401, 403, 404, 409 | `ADMIN`, `EDITOR` |
+| `DELETE` | `/api/productos/{id}` | 204, 401, 403, 404 | `ADMIN` |
+| `GET` | `/api/categorias` | 200 | Público |
+| `POST` | `/api/categorias` | 201, 400, 401, 403, 409 | `ADMIN` |
+| `DELETE` | `/api/categorias/{id}` | 204, 401, 403, 404, 409 | `ADMIN` |
+| `GET` | `/api/usuarios/{usuario}` | 200, 401, 403, 404 | `ADMIN` |
+| `GET` | `/actuator/health` | 200 | Público (detalle según autorización) |
+| `GET` | `/actuator/info` | 200 | Público |
+
+No se exponen otros Actuator endpoints; en particular, `/actuator/env` y `/actuator/heapdump` no están habilitados. Health details/components usan `when-authorized`.
+
+### Docker y Compose
+
+Requiere Docker con Compose. En PowerShell, copia `.env.ejemplo` a `.env`, cambia la contraseña y el secreto ficticios por valores seguros, y configura los orígenes frontend:
+
+```powershell
+Copy-Item .env.ejemplo .env
+docker compose -f compose.yaml up --build -d
+docker compose -f compose.yaml ps
+docker compose -f compose.yaml logs -f api
+```
+
+Compose inicia PostgreSQL 16 y la API con perfil `prod`; la API espera al healthcheck `pg_isready` y utiliza el host interno `postgres`, no `localhost`. PostgreSQL se publica en el host como `localhost:5434` (puerto interno `5432`), para no interferir con el contenedor independiente que usa `5433`; la API se publica en `localhost:8080`. La base conserva sus datos en `catalogo_deploy_pgdata`. Para detener los servicios sin borrar datos: `docker compose -f compose.yaml down`. No uses `down -v` si deseas conservar el volumen. El Dockerfile compila con Maven/JDK 21 y ejecuta el JAR con JRE 21 en una imagen final; su tamaño debe verificarse con `docker image inspect` luego de construirla.
+
+### Despliegue en Render o plataforma equivalente
+
+El proyecto está preparado para desplegarse, pero **no está publicado**; no hay URL pública que reportar. Pasos manuales:
+
+1. Crea una base PostgreSQL administrada y conserva sus datos en la plataforma. Usa una base vacía para la primera ejecución de Flyway o prepara antes la migración de cualquier base existente.
+2. Crea un servicio web desde la rama `despliegue`, selecciona el Dockerfile del repositorio y configura las variables `SPRING_PROFILES_ACTIVE=prod`, `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRETO` y `CORS_ORIGENES`. La URL JDBC debe usar el hostname interno y puerto que indique el proveedor, en formato `jdbc:postgresql://<host-interno>:<puerto>/<base>`.
+3. Genera un `JWT_SECRETO` aleatorio con al menos 32 bytes. Guarda credenciales solo en el gestor de variables de la plataforma. No publiques los valores ni la URL de conexión con credenciales.
+4. Deja que la plataforma defina `PORT`; si ofrece una opción de puerto explícita, configura el servicio para que pase esa variable a la aplicación. Spring usa `${PORT:8080}`.
+5. Espera al arranque y verifica `/actuator/health`. Una vez asignado el dominio real, agrega el origen exacto del frontend a `CORS_ORIGENES`, separado por comas si son varios.
+
+Cuando el despliegue real esté terminado, añade aquí la URL asignada por el proveedor y la URL real de health. En producción, Swagger UI y `/v3/api-docs` están intencionalmente deshabilitados.
+
+### Demostraciones del taller (pendientes de ejecutar y evidenciar)
+
+No se adjuntan resultados ni capturas nuevas. Ejecuta las demostraciones de forma manual en entornos desechables y agrega evidencia real en `evidencias/` antes de afirmar sus resultados.
+
+#### 1. Perfil prod sin `JWT_SECRETO`
+
+Usa una base desechable ya disponible y configura `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `CORS_ORIGENES` y `SPRING_PROFILES_ACTIVE=prod`. En PowerShell elimina solo la variable de la sesión actual e intenta iniciar:
+
+```powershell
+Remove-Item Env:JWT_SECRETO -ErrorAction SilentlyContinue
+$env:SPRING_PROFILES_ACTIVE = "prod"
+.\mvnw.cmd spring-boot:run
+```
+
+Registra la salida de arranque y confirma el fallo asociado a la propiedad obligatoria `JWT_SECRETO`. No copies secretos en la captura; elimina variables temporales al finalizar. Esta verificación no se ha ejecutado como parte de esta implementación.
+
+#### 2. Schema validation por campo sin migración
+
+En una copia temporal/desacoplada del proyecto y una base efímera (nunca en la base con datos), agrega temporalmente a una entidad un campo persistente, por ejemplo `@Column(name = "campo_sin_migracion") private String campoSinMigracion;`, sin agregar una migración. Arranca la aplicación con un perfil que conecte a esa base y `ddl-auto=validate`; registra el error de columna/validación, luego descarta el cambio temporal. No dejes la entidad ni una base de trabajo con ese cambio. No uses `ddl-auto=create` sobre la base del proyecto. La demostración está pendiente y no se afirma un resultado aún.
+
+#### 3. Swagger en dev y deshabilitado en prod
+
+Con credenciales válidas para cada entorno, inicia primero con `SPRING_PROFILES_ACTIVE=dev` y verifica la respuesta de `/swagger-ui/index.html` y `/v3/api-docs`. Luego inicia con `SPRING_PROFILES_ACTIVE=prod` y verifica ambas rutas autenticado: Swagger no debe proveer la UI ni la especificación; sin autenticación, las rutas no se permiten públicamente. Guarda capturas/resultados separados por perfil, sin tokens visibles. No se han ejecutado estas verificaciones.
+
+### Integración con Angular y evidencia frontend
+
+El repositorio actual no contiene el cliente Angular, por lo que no se modificó. En la configuración de entorno Angular, cambia la URL base de la API al dominio **real** que asigne la plataforma; no uses una URL inventada ni la URL de Swagger como base REST. En el proveedor del backend define `CORS_ORIGENES` con el origen exacto del frontend (esquema y hostname, sin ruta), por ejemplo `https://<dominio-frontend-asignado>` solo como marcador, no como URL publicada.
+
+Después de desplegar ambos proyectos, comprueba desde el navegador la solicitud preflight `OPTIONS` y luego una consulta pública. Para operaciones protegidas, inicia sesión y confirma que Angular envía `Authorization: Bearer <token>` y recibe el resultado permitido para el rol. Adjunta aquí una captura real de la app consumiendo esta API:
+
+> **Evidencia pendiente:** agregar captura real del frontend Angular conectado a la API desplegada; ocultar tokens, datos personales y credenciales.
+
+### Compilación y pruebas
+
+```powershell
+.\mvnw.cmd clean test
+```
+
+Las pruebas usan H2 y datos de prueba cargados solo bajo `test`; no requieren PostgreSQL ni Docker. Para validar únicamente compilación y empaquetado sin ejecutar pruebas, usa `.\mvnw.cmd -DskipTests package`.
+
+## Documentación histórica de Backend 01–04
 
 Proyecto desarrollado progresivamente durante los talleres Backend 01, 02, 03 y 04. La API de catálogo comenzó con operaciones REST y persistencia, y evolucionó para incluir optimización de consultas, DTOs y validación, transacciones, manejo uniforme de errores y autenticación con Spring Security y JWT.
 
@@ -218,7 +356,7 @@ Inicia la aplicación:
 .\mvnw.cmd spring-boot:run
 ```
 
-La aplicación conserva la conexión local `localhost:5433/catalogo`. No cambies ese puerto ni recrees la base o sus volúmenes. Comprueba el mapeo antes de iniciar cualquier contenedor: el `docker-compose.yml` versionado publica actualmente el puerto local 5432, mientras la aplicación espera 5433; reutiliza la configuración existente de `catalogo-db` en 5433 en lugar de asumir que ambos mapeos son intercambiables.
+La configuración local actual de desarrollo mantiene `localhost:5433/catalogo`; el nuevo `compose.yaml` publica el puerto de PostgreSQL en el host 5433 y la API en Compose se conecta por el nombre interno `postgres:5432`. El volumen nuevo de Compose es independiente del volumen local previo; revisa la sección de perfiles antes de migrar una base existente.
 
 Para modificar los orígenes CORS en la sesión de PowerShell:
 
@@ -309,6 +447,21 @@ TypeError: Failed to fetch
 El resultado demuestra que el navegador bloquea la respuesta: `Access-Control-Allow-Origin: *` no se puede combinar con credenciales. La solución es especificar explícitamente los orígenes permitidos. La configuración normal del proyecto no cambia: `CorsConfigurationSource` obtiene los orígenes de `app.cors.origenes` (por defecto, `http://localhost:4200`); el comodín se usó solo durante esta demostración.
 
 Para revocar tokens antes de su expiración se podrían implementar expiraciones más cortas, una lista de revocación consultada por el servidor o refresh tokens rotatorios y revocables. Estas alternativas requieren diseñar y gestionar estado adicional.
+
+### Entorno aislado de pruebas (perfil `dev`)
+
+El Compose de desarrollo usa una base y volumen separados (`catalogo_dev_pgdata`), publica PostgreSQL en `5435` y la API en `8081`, y activa el perfil `dev`. No cambia el Compose normal ni sus datos. En PowerShell, copia el ejemplo a `.env.dev` y completa todos los valores vacíos; usa contraseñas aleatorias de al menos 16 bytes (máximo 72 bytes para BCrypt) y un secreto JWT de al menos 32 bytes:
+
+```powershell
+Copy-Item .env.dev.example .env.dev
+docker compose --env-file .env.dev -f compose.dev.yaml up --build -d
+docker compose --env-file .env.dev -f compose.dev.yaml ps
+docker compose --env-file .env.dev -f compose.dev.yaml logs api
+```
+
+Configura `TEST_ADMIN_USERNAME`, `TEST_ADMIN_PASSWORD`, `TEST_EDITOR_USERNAME` y `TEST_EDITOR_PASSWORD` en `.env.dev`. El inicializador `CuentasPruebaDev` crea las cuentas solo con perfil `dev`, guarda las contraseñas con BCrypt y no cambia cuentas que ya existan; si un nombre ya existe con otro rol o está inactivo, el arranque falla en vez de elevarlo. `DatosIniciales` carga los 20 productos únicamente cuando la tabla de productos de esa base está vacía. Las cuentas nuevas usan correos `@example.test`.
+
+Inicia sesión con `POST http://localhost:8081/api/auth/login` usando las credenciales de ADMIN o EDITOR y configura el JWT como Bearer en Insomnia. Ambos roles pueden crear y actualizar productos; solo ADMIN puede eliminarlos. La cuenta EDITOR debe recibir 403 al intentar borrar. Los datos de prueba persisten en el volumen de desarrollo; para conservarlos, no uses `docker compose down -v`.
 
 ## Seguridad y datos
 

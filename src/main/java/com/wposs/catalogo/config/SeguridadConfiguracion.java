@@ -4,7 +4,9 @@ import com.wposs.catalogo.seguridad.FiltroJwt;
 import com.wposs.catalogo.seguridad.RespuestaErrorSeguridad;
 import com.wposs.catalogo.servicio.ServicioJwt;
 import com.wposs.catalogo.servicio.UsuarioDetallesServicio;
+
 import java.util.Arrays;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -68,11 +70,14 @@ public class SeguridadConfiguracion {
                                             ServicioJwt servicioJwt,
                                             UsuarioDetallesServicio usuarios,
                                             AuthenticationProvider proveedor,
-                                            RespuestaErrorSeguridad errores) throws Exception {
+                                            RespuestaErrorSeguridad errores,
+                                            @Value("${catalogo.swagger-publico:false}") boolean swaggerPublico)
+            throws Exception {
         FiltroJwt filtroJwt = new FiltroJwt(servicioJwt, usuarios);
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                .cors(cors -> { })
+                .cors(cors -> {
+                })
                 .sessionManagement(sesion -> sesion.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(proveedor)
                 .exceptionHandling(excepciones -> excepciones
@@ -84,19 +89,26 @@ public class SeguridadConfiguracion {
                                 errores.escribir(solicitud, respuesta,
                                         org.springframework.http.HttpStatus.FORBIDDEN,
                                         "No tiene permisos para realizar esta operación")))
-                .authorizeHttpRequests(autorizacion -> autorizacion
-                        .requestMatchers(HttpMethod.POST, "/api/auth/registro", "/api/auth/login").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/auth/yo").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/productos/**", "/api/categorias/**").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/productos/**").hasAnyRole("ADMIN", "EDITOR")
-                        .requestMatchers(HttpMethod.PUT, "/api/productos/**").hasAnyRole("ADMIN", "EDITOR")
-                        .requestMatchers(HttpMethod.DELETE, "/api/productos/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/categorias/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/categorias/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PATCH, "/api/categorias/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/categorias/**").hasRole("ADMIN")
-                        .requestMatchers("/api/usuarios/**").hasRole("ADMIN")
-                        .anyRequest().authenticated())
+                .authorizeHttpRequests(autorizacion -> {
+                    if (swaggerPublico) {
+                        autorizacion.requestMatchers("/v3/api-docs", "/v3/api-docs/**",
+                                "/v3/api-docs.yaml", "/swagger-ui.html", "/swagger-ui/**").permitAll();
+                    }
+                    autorizacion
+                            .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
+                            .requestMatchers(HttpMethod.POST, "/api/auth/registro", "/api/auth/login").permitAll()
+                            .requestMatchers(HttpMethod.GET, "/api/auth/yo").authenticated()
+                            .requestMatchers(HttpMethod.GET, "/api/productos/**", "/api/categorias/**").permitAll()
+                            .requestMatchers(HttpMethod.POST, "/api/productos/**").hasAnyRole("ADMIN", "EDITOR")
+                            .requestMatchers(HttpMethod.PUT, "/api/productos/**").hasAnyRole("ADMIN", "EDITOR")
+                            .requestMatchers(HttpMethod.DELETE, "/api/productos/**").hasRole("ADMIN")
+                            .requestMatchers(HttpMethod.POST, "/api/categorias/**").hasRole("ADMIN")
+                            .requestMatchers(HttpMethod.PUT, "/api/categorias/**").hasRole("ADMIN")
+                            .requestMatchers(HttpMethod.PATCH, "/api/categorias/**").hasRole("ADMIN")
+                            .requestMatchers(HttpMethod.DELETE, "/api/categorias/**").hasRole("ADMIN")
+                            .requestMatchers("/api/usuarios/**").hasRole("ADMIN")
+                            .anyRequest().authenticated();
+                })
                 .addFilterBefore(filtroJwt, UsernamePasswordAuthenticationFilter.class)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable);

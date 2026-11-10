@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Define POSTGRES_DB en .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Define POSTGRES_USER en .env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Define DB_PASSWORD en .env}
+    ports:
+      - "${DB_HOST_PORT:-5434}:5432"
+    volumes:
+      - catalogo_deploy_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      PORT: "8080"
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Define POSTGRES_DB en .env}
+      DB_USERNAME: ${POSTGRES_USER:?Define POSTGRES_USER en .env}
+      DB_PASSWORD: ${DB_PASSWORD:?Define DB_PASSWORD en .env}
+      JWT_SECRETO: ${JWT_SECRETO:?Define JWT_SECRETO en .env}
+      CORS_ORIGENES: ${CORS_ORIGENES:?Define CORS_ORIGENES en .env}
+    ports:
+      - "${APP_HOST_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+volumes:
+  catalogo_deploy_pgdata:
+    name: catalogo_deploy_pgdata

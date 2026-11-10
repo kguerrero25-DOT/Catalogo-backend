@@ -1,0 +1,47 @@
+name: catalogo-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Define POSTGRES_DB en .env.dev}
+      POSTGRES_USER: ${POSTGRES_USER:?Define POSTGRES_USER en .env.dev}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Define DB_PASSWORD en .env.dev}
+    ports:
+      - "${DB_HOST_PORT:-5435}:5432"
+    volumes:
+      - catalogo_dev_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env.dev
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      PORT: "8080"
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Define POSTGRES_DB en .env.dev}
+      DB_USERNAME: ${POSTGRES_USER:?Define POSTGRES_USER en .env.dev}
+      DB_PASSWORD: ${DB_PASSWORD:?Define DB_PASSWORD en .env.dev}
+      JWT_SECRETO: ${JWT_SECRETO:?Define JWT_SECRETO en .env.dev}
+      CORS_ORIGENES: ${CORS_ORIGENES:?Define CORS_ORIGENES en .env.dev}
+      TEST_ADMIN_USERNAME: ${TEST_ADMIN_USERNAME:?Define TEST_ADMIN_USERNAME en .env.dev}
+      TEST_ADMIN_PASSWORD: ${TEST_ADMIN_PASSWORD:?Define TEST_ADMIN_PASSWORD en .env.dev}
+      TEST_EDITOR_USERNAME: ${TEST_EDITOR_USERNAME:?Define TEST_EDITOR_USERNAME en .env.dev}
+      TEST_EDITOR_PASSWORD: ${TEST_EDITOR_PASSWORD:?Define TEST_EDITOR_PASSWORD en .env.dev}
+    ports:
+      - "${APP_HOST_PORT:-8081}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  catalogo_dev_pgdata:
+    name: catalogo_dev_pgdata
