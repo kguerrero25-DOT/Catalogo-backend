@@ -34,7 +34,8 @@ public class CategoriaControlador {
     }
 
     @GetMapping
-    @Operation(summary = "Listar categorias")
+    @Operation(summary = "Listar categorias",
+            description = "Lista las categorias disponibles. Acceso publico; devuelve el listado de categorias.")
     @ApiResponses({@ApiResponse(responseCode = "200", description = "Listado obtenido")})
     public ResponseEntity<List<CategoriaDetalle>> listar() {
         return ResponseEntity.ok(servicio.listarDetalles());

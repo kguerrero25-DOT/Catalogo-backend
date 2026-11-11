@@ -20,6 +20,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class ManejadorGlobalExcepciones {
@@ -87,6 +88,12 @@ public class ManejadorGlobalExcepciones {
     public ResponseEntity<ErrorRespuesta> manejarCredencialesInvalidas(
             BadCredentialsException excepcion, HttpServletRequest solicitud) {
         return respuesta(HttpStatus.UNAUTHORIZED, "usuario o contraseña incorrectos", null, solicitud);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorRespuesta> manejarRutaNoEncontrada(
+            NoResourceFoundException excepcion, HttpServletRequest solicitud) {
+        return respuesta(HttpStatus.NOT_FOUND, "La ruta solicitada no existe", null, solicitud);
     }
 
     @ExceptionHandler(Exception.class)
